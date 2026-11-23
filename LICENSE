@@ -28,8 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -------------------------------------------------------------------------------
 
 goapm is a derivative work of WebRTC (https://webrtc.googlesource.com/src):
-it ports modules/audio_processing/aec3, the band splitting of
-modules/audio_processing and parts of common_audio. That code is distributed
+it ports parts of modules/audio_processing and common_audio. That code is distributed
 under the license below. WebRTC also comes with an additional intellectual
 property rights grant, the PATENTS file in the root of the WebRTC source tree
 (https://webrtc.googlesource.com/src/+/refs/heads/main/PATENTS).
