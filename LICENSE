@@ -27,7 +27,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
 
-goaec3 is a derivative work of WebRTC (https://webrtc.googlesource.com/src):
+goapm is a derivative work of WebRTC (https://webrtc.googlesource.com/src):
 it ports modules/audio_processing/aec3, the band splitting of
 modules/audio_processing and parts of common_audio. That code is distributed
 under the license below. WebRTC also comes with an additional intellectual
