@@ -67,9 +67,11 @@ jobs:
           key: webrtc-m141-${{ hashFiles('scripts/fetch-webrtc.sh') }}
       - name: Fetch WebRTC sources
         run: bash scripts/fetch-webrtc.sh
-      - name: clang
+      # libwebrtc is built by clang against libc++.
+      - name: clang and libc++
         run: |
-          command -v clang >/dev/null || { sudo apt-get update && sudo apt-get install -y clang; }
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
           clang --version
       - name: Table script
         run: |

@@ -11,6 +11,13 @@
 #error "the oracle is a release (NDEBUG) build, like libwebrtc"
 #endif
 
+#if defined(__cplusplus)
+#include <version>
+#if !defined(_LIBCPP_VERSION)
+#error "the oracle builds against libc++, like libwebrtc (libc++-dev on Linux)"
+#endif
+#endif
+
 #pragma clang fp contract(off)
 #pragma clang diagnostic ignored "-Wnullability-completeness"
 

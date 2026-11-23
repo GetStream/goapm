@@ -42,3 +42,9 @@ func goapmSinf(x C.float) C.float {
 	libmCalls.Add(1)
 	return C.float(cmath.Sinf(float32(x)))
 }
+
+//export goapmAtanf
+func goapmAtanf(x C.float) C.float {
+	libmCalls.Add(1)
+	return C.float(cmath.Atanf(float32(x)))
+}

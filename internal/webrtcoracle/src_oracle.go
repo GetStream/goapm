@@ -18,6 +18,11 @@ package webrtcoracle
 // webrtc_oracle build. The purego tag leaves out WEBRTC_HAS_NEON, which
 // compiles the scalar paths.
 //
+// The C++ standard library is libc++ on every platform, as in libwebrtc's
+// own build: the sources call tanh and fabs unqualified on floats, which
+// libc++ resolves to the float overloads and libstdc++ to the double
+// functions of the C library.
+//
 // Every translation unit starts with prelude.h, which requires clang and
 // turns floating-point contraction off for the whole unit, as libwebrtc's
 // -ffp-contract=off does (cgo does not accept that flag without
@@ -30,8 +35,8 @@ package webrtcoracle
 #cgo darwin CXXFLAGS: -DWEBRTC_MAC
 #cgo darwin LDFLAGS: -lc++
 #cgo linux CFLAGS: -DWEBRTC_LINUX
-#cgo linux CXXFLAGS: -DWEBRTC_LINUX
-#cgo linux LDFLAGS: -lstdc++ -lm
+#cgo linux CXXFLAGS: -DWEBRTC_LINUX -stdlib=libc++
+#cgo linux LDFLAGS: -lc++ -lm
 */
 import "C"
 

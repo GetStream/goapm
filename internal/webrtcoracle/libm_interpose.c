@@ -10,10 +10,11 @@
 // tag leaves them out, to measure goapm against the C++ on the host libm.
 //
 //
-// fft4g.cc builds the tables of the 256-point FFT with (float)cos(x) and
-// (float)sin(x) of a float x, which clang narrows to cosf and sinf, and
-// pairs to __sincosf_stret on Darwin and sincosf on glibc. A build that
-// keeps the double functions gets the float64 results the Go helpers round.
+// fft4g.cc builds the tables of the 256-point FFT with atanf(1.0f), which
+// some versions of clang fold, and (float)cos(x) and (float)sin(x) of a
+// float x, which clang narrows to cosf and sinf, and pairs to
+// __sincosf_stret on Darwin and sincosf on glibc. A build that keeps the
+// double functions gets the float64 results the Go helpers round.
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -21,11 +22,13 @@ float goapmExp2f(float);
 float goapmTanhf(float);
 float goapmCosf(float);
 float goapmSinf(float);
+float goapmAtanf(float);
 
 float exp2f(float x) { return goapmExp2f(x); }
 float tanhf(float x) { return goapmTanhf(x); }
 float cosf(float x) { return goapmCosf(x); }
 float sinf(float x) { return goapmSinf(x); }
+float atanf(float x) { return goapmAtanf(x); }
 
 float powf(float base, float x) {
   if (base == 2.0f) return goapmExp2f(x);

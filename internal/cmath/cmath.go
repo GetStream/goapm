@@ -24,6 +24,9 @@ func Cosf(x float32) float32 { return float32(math.Cos(float64(x))) }
 // Sinf returns the sine of x rounded to float32.
 func Sinf(x float32) float32 { return float32(math.Sin(float64(x))) }
 
+// Atanf returns the arctangent of x rounded to float32.
+func Atanf(x float32) float32 { return float32(math.Atan(float64(x))) }
+
 // Min returns std::min(a, b): b if b < a, else a. With a NaN operand the
 // result is a.
 func Min(a, b float32) float32 {

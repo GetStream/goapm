@@ -77,3 +77,13 @@ func TestMinMax(t *testing.T) {
 		t.Fatal("Min or Max of zeros of both signs")
 	}
 }
+
+func TestAtanf(t *testing.T) {
+	// fft4g.cc derives its table step from atanf(1.0f), pi/4.
+	if got := Atanf(1); math.Float32bits(got) != 0x3f490fdb {
+		t.Fatalf("Atanf(1) = %#x, want 0x3f490fdb", math.Float32bits(got))
+	}
+	if Atanf(0) != 0 || Atanf(-1) != -Atanf(1) {
+		t.Fatal("Atanf is not odd through 0")
+	}
+}

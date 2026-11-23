@@ -39,9 +39,11 @@ jobs:
           key: webrtc-m141-${{ hashFiles('scripts/fetch-webrtc.sh') }}
       - name: Fetch WebRTC sources
         run: bash scripts/fetch-webrtc.sh
-      - name: clang
+      # libwebrtc is built by clang against libc++.
+      - name: clang and libc++
         run: |
-          command -v clang >/dev/null || { sudo apt-get update && sudo apt-get install -y clang; }
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
           clang --version
       - name: make lint (gofmt, go vet per build, generated files current)
         run: make lint CLANG_CC=clang CLANG_CXX=clang++
@@ -167,9 +169,11 @@ jobs:
           key: webrtc-m141-${{ hashFiles('scripts/fetch-webrtc.sh') }}
       - name: Fetch WebRTC sources
         run: bash scripts/fetch-webrtc.sh
-      - name: clang
+      # libwebrtc is built by clang against libc++.
+      - name: clang and libc++
         run: |
-          command -v clang >/dev/null || { sudo apt-get update && sudo apt-get install -y clang; }
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
           clang --version
       - name: Parity against the source-built WebRTC
         run: go test -count=1 -timeout 40m -v -tags "webrtc_src_oracle ${{ matrix.tags }}" ./internal/webrtcoracle/ 2>&1 | grep -v '^=== RUN'
