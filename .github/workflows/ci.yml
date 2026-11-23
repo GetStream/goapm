@@ -1,0 +1,184 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Nightly, to catch runner image and toolchain drift.
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its running checks; runs on main,
+# nightly and manual runs always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GO_VERSION: "1.27.4"
+  GOTOOLCHAIN: local
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Cache WebRTC sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tmp_check/webrtc-m141
+          key: webrtc-m141-${{ hashFiles('scripts/fetch-webrtc.sh') }}
+      - name: Fetch WebRTC sources
+        run: bash scripts/fetch-webrtc.sh
+      # libwebrtc is built by clang against libc++.
+      - name: clang and libc++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
+          clang --version
+      - name: make lint (gofmt, go vet per build, generated files current)
+        run: make lint CLANG_CC=clang CLANG_CXX=clang++
+      - name: actionlint
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
+  # Known vulnerabilities in the module's dependencies and in the standard
+  # library of GO_VERSION, in the code the packages and their tests reach.
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: govulncheck
+        run: make vuln
+
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.lane }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        lane: [default, simd, purego]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go test
+        run: |
+          case "${{ matrix.lane }}" in
+            default) go test -count=1 ./... ;;
+            simd) GOEXPERIMENT=simd go test -count=1 ./... ;;
+            purego) go test -count=1 -tags purego ./... ;;
+          esac
+
+  # 32-bit targets, where int has 32 bits: they run the scalar lane.
+  test-32bit:
+    name: test-32bit (${{ matrix.goarch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, goarch: "386" }
+          - { os: ubuntu-24.04-arm, goarch: arm }
+    runs-on: ${{ matrix.os }}
+    env:
+      GOARCH: ${{ matrix.goarch }}
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go test
+        run: go test -count=1 ./...
+
+  # The race detector over the short test suite, with the pure-Go lane
+  # references and with the archsimd kernels.
+  race:
+    name: race (${{ matrix.lane }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { lane: default }
+          - { lane: simd, experiment: simd }
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: ${{ matrix.experiment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: go test -race -short
+        run: go test -count=1 -race -short ./...
+
+  # Parity against the C++ reference built from the pinned WebRTC sources,
+  # module by module and end to end. The jobs marked stock also run the
+  # tests against the C++ on glibc's libm: reported, not gated, since
+  # glibc's float functions need not return the rounded values goapm and the
+  # gated oracle use.
+  oracle-src:
+    name: oracle-src (${{ matrix.os }}, ${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, name: simd, experiment: simd, stock: true }
+          - { os: ubuntu-latest, name: default }
+          - { os: ubuntu-latest, name: scalar, tags: purego }
+          - { os: ubuntu-24.04-arm, name: simd, experiment: simd, stock: true }
+          - { os: ubuntu-24.04-arm, name: default }
+          - { os: ubuntu-24.04-arm, name: scalar, tags: purego }
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: clang
+      CXX: clang++
+      GOEXPERIMENT: ${{ matrix.experiment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Cache WebRTC sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tmp_check/webrtc-m141
+          key: webrtc-m141-${{ hashFiles('scripts/fetch-webrtc.sh') }}
+      - name: Fetch WebRTC sources
+        run: bash scripts/fetch-webrtc.sh
+      # libwebrtc is built by clang against libc++.
+      - name: clang and libc++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
+          clang --version
+      - name: Parity against the source-built WebRTC
+        run: go test -count=1 -timeout 40m -v -tags "webrtc_src_oracle ${{ matrix.tags }}" ./internal/webrtcoracle/ 2>&1 | grep -v '^=== RUN'
+        shell: bash -o pipefail {0}
+      - name: Divergence on glibc's libm (reported, not gated)
+        if: matrix.stock
+        run: go test -count=1 -timeout 40m -v -tags "webrtc_src_oracle webrtc_oracle_stock" ./internal/webrtcoracle/ 2>&1 | grep -v '^=== RUN' || true
+        shell: bash -o pipefail {0}

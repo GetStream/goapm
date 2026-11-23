@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+  # Keeps the commit each action is pinned to, and the version in the
+  # comment behind it, current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
