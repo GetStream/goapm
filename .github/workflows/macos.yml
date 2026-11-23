@@ -1,0 +1,58 @@
+name: macos
+
+# macOS runners are scarce in this organization and can queue for hours. This
+# workflow is separate from ci so a waiting macOS job never holds up the
+# required Linux checks; a newer run cancels an older one that is still waiting.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.27.4"
+  GOTOOLCHAIN: local
+
+jobs:
+  macos:
+    runs-on: macos-15
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Cache WebRTC sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tmp_check/webrtc-m141
+          key: webrtc-m141-${{ hashFiles('scripts/fetch-webrtc.sh') }}
+      - name: Fetch WebRTC sources
+        run: bash scripts/fetch-webrtc.sh
+      - name: go test (default, simd, purego)
+        run: |
+          go test -count=1 ./...
+          GOEXPERIMENT=simd go test -count=1 ./...
+          go test -count=1 -tags purego ./...
+      - name: Parity against the source-built WebRTC (simd)
+        run: GOEXPERIMENT=simd go test -count=1 -timeout 40m -v -tags webrtc_src_oracle ./internal/webrtcoracle/ 2>&1 | grep -v '^=== RUN'
+        shell: bash -o pipefail {0}
+      - name: Parity against the source-built WebRTC (scalar)
+        run: go test -count=1 -timeout 40m -v -tags "webrtc_src_oracle purego" ./internal/webrtcoracle/ 2>&1 | grep -v '^=== RUN'
+        shell: bash -o pipefail {0}
+      - name: Divergence on Apple libm (reported, not gated)
+        run: GOEXPERIMENT=simd go test -count=1 -timeout 40m -v -tags "webrtc_src_oracle webrtc_oracle_stock" ./internal/webrtcoracle/ 2>&1 | grep -v '^=== RUN' || true
+        shell: bash -o pipefail {0}
